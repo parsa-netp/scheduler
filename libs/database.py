@@ -23,11 +23,11 @@ def init_db():
             start_dt TEXT NOT NULL,
             end_dt TEXT NOT NULL,
             icon TEXT DEFAULT 'EVENT',
-            color TEXT DEFAULT 'BLUE_700'
+            color TEXT DEFAULT 'BLUE_700',
+            description TEXT NOT NULL DEFAULT ''
         )
     """)
     # Notes table (multi-note, Google Keep style)
-    conn.execute("DROP TABLE IF EXISTS notes")
     conn.execute("""
         CREATE TABLE IF NOT EXISTS notes (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -39,6 +39,31 @@ def init_db():
             updated_at TEXT NOT NULL
         )
     """)
+    # Migrate old schema if needed (add missing columns)
+    try:
+        conn.execute("ALTER TABLE notes ADD COLUMN title TEXT NOT NULL DEFAULT ''")
+    except Exception:
+        pass
+    try:
+        conn.execute("ALTER TABLE notes ADD COLUMN color TEXT NOT NULL DEFAULT 'GREY_700'")
+    except Exception:
+        pass
+    try:
+        conn.execute("ALTER TABLE notes ADD COLUMN pinned INTEGER NOT NULL DEFAULT 0")
+    except Exception:
+        pass
+    try:
+        conn.execute("ALTER TABLE notes ADD COLUMN created_at TEXT NOT NULL DEFAULT ''")
+    except Exception:
+        pass
+    try:
+        conn.execute("ALTER TABLE notes ADD COLUMN updated_at TEXT NOT NULL DEFAULT ''")
+    except Exception:
+        pass
+    try:
+        conn.execute("ALTER TABLE events ADD COLUMN description TEXT NOT NULL DEFAULT ''")
+    except Exception:
+        pass
     conn.commit()
     conn.close()
 
@@ -105,14 +130,16 @@ def delete_note(note_id):
     conn.close()
 
 
-def add_event(title, start_dt, end_dt, icon="EVENT", color="BLUE_700"):
+def add_event(title, start_dt, end_dt, icon="EVENT", color="BLUE_700", description=""):
     conn = get_db()
-    conn.execute(
-        "INSERT INTO events (title, start_dt, end_dt, icon, color) VALUES (?, ?, ?, ?, ?)",
-        (title, start_dt, end_dt, icon, color),
+    cursor = conn.execute(
+        "INSERT INTO events (title, start_dt, end_dt, icon, color, description) VALUES (?, ?, ?, ?, ?, ?)",
+        (title, start_dt, end_dt, icon, color, description),
     )
     conn.commit()
+    event_id = cursor.lastrowid
     conn.close()
+    return event_id
 
 
 def get_events_for_day(target_date: date):
@@ -134,11 +161,11 @@ def get_all_events():
     return events
 
 
-def update_event(event_id: int, title: str, start_dt: str, end_dt: str, icon: str = "EVENT", color: str = "BLUE_700"):
+def update_event(event_id: int, title: str, start_dt: str, end_dt: str, icon: str = "EVENT", color: str = "BLUE_700", description: str = ""):
     conn = get_db()
     conn.execute(
-        "UPDATE events SET title=?, start_dt=?, end_dt=?, icon=?, color=? WHERE id=?",
-        (title, start_dt, end_dt, icon, color, event_id),
+        "UPDATE events SET title=?, start_dt=?, end_dt=?, icon=?, color=?, description=? WHERE id=?",
+        (title, start_dt, end_dt, icon, color, description, event_id),
     )
     conn.commit()
     conn.close()
