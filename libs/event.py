@@ -16,10 +16,12 @@ EVENT_ICONS = {
 
 
 class Event:
-    def __init__(self, timeline, event_data: dict):
+    def __init__(self, timeline, event_data: dict, overlap_right: bool = False, is_multiday: bool = False):
         self.timeline = timeline
         self.main_page = timeline.main_page
         self.event_data = event_data
+        self.overlap_right = overlap_right
+        self.is_multiday = is_multiday
 
         self.start = parse_dt_safe(event_data["start_dt"])
         self.end = parse_dt_safe(event_data["end_dt"])
@@ -39,43 +41,31 @@ class Event:
         icon_name = self.event_data.get("icon", "EVENT")
         icon_src = EVENT_ICONS.get(icon_name, ft.Icons.EVENT)
         description = self.event_data.get("description", "")
+        TEXT_COLOR = ft.Colors.WHITE
 
         text_column = ft.Column(
             spacing=1,
-            alignment=ft.MainAxisAlignment.CENTER,
+            controls=[
+                ft.Row([
+                    ft.Icon(icon_src, size=11, color=TEXT_COLOR),
+                    ft.Text(self.event_data["title"], size=11, color=TEXT_COLOR, weight=ft.FontWeight.BOLD, overflow=ft.TextOverflow.ELLIPSIS),
+                ], spacing=4),
+            ],
             expand=True,
         )
-        
-        text_column.controls.append(
-            ft.Text(
-                self.event_data["title"],
-                color=ft.Colors.WHITE,
-                size=12,
-                weight=ft.FontWeight.BOLD,
-                overflow=ft.TextOverflow.ELLIPSIS,
-                max_lines=1,
-            )
-        )
-        
-        if description and self.duration_hours >= 0.75:
+
+        if description:
             text_column.controls.append(
-                ft.Text(
-                    description,
-                    color=ft.Colors.WHITE70,
-                    size=10,
-                    overflow=ft.TextOverflow.ELLIPSIS,
-                    max_lines=1,
-                )
+                ft.Text(description, size=9, color=ft.Colors.GREY_300, overflow=ft.TextOverflow.ELLIPSIS, max_lines=1)
             )
 
         card_body = ft.Container(
             content=ft.Row(
-                spacing=6,
-                vertical_alignment=ft.CrossAxisAlignment.CENTER,
-                controls=[
-                    ft.Icon(icon_src, size=16, color=ft.Colors.WHITE),
+                [
+                    ft.Container(width=3, bgcolor=TEXT_COLOR, border_radius=1),
                     text_column,
                 ],
+                spacing=6,
             ),
             bgcolor=self.color,
             border_radius=6,
@@ -95,8 +85,8 @@ class Event:
 
         self.container = ft.Container(
             top=self._top,
-            left=LABEL_WIDTH,
-            right=0,
+            left=0 if self.is_multiday else LABEL_WIDTH,
+            right=10 if self.is_multiday else (140 if self.overlap_right else 0),
             height=HOUR_HEIGHT * self.duration_hours,
             content=gesture,
             padding=0,
@@ -310,10 +300,13 @@ class Event:
 
         def remove_pickers():
             if date_picker in self.main_page.overlay:
+                date_picker.open = False
                 self.main_page.overlay.remove(date_picker)
             if start_time_picker in self.main_page.overlay:
+                start_time_picker.open = False
                 self.main_page.overlay.remove(start_time_picker)
             if end_time_picker in self.main_page.overlay:
+                end_time_picker.open = False
                 self.main_page.overlay.remove(end_time_picker)
 
         def close_dlg(_):

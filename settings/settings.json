@@ -1,0 +1,30 @@
+{
+    "ui": {
+        "page_color": "GREY_900",
+        "window_color": "BLACK",
+        "box_color": "GREY_800",
+        "text_color": "WHITE",
+        "line_color": "GREY_700",
+        "label_color": "GREY_500"
+    },
+    "layout": {
+        "padding": 15,
+        "radius": 10,
+        "hour_height": 55,
+        "label_width": 40
+    },
+    "behavior": {
+        "event_hours": [
+            9,
+            10,
+            14,
+            15,
+            16
+        ]
+    },
+    "fab": {
+        "mini": true,
+        "right": 30,
+        "bottom": 30
+    }
+}

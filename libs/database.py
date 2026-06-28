@@ -39,6 +39,16 @@ def init_db():
             updated_at TEXT NOT NULL
         )
     """)
+    # Reminders table
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS reminders (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            title TEXT NOT NULL,
+            reminder_dt TEXT NOT NULL,
+            color TEXT DEFAULT 'AMBER_700',
+            all_day INTEGER DEFAULT 0
+        )
+    """)
     # Migrate old schema if needed (add missing columns)
     try:
         conn.execute("ALTER TABLE notes ADD COLUMN title TEXT NOT NULL DEFAULT ''")
@@ -62,6 +72,10 @@ def init_db():
         pass
     try:
         conn.execute("ALTER TABLE events ADD COLUMN description TEXT NOT NULL DEFAULT ''")
+    except Exception:
+        pass
+    try:
+        conn.execute("ALTER TABLE reminders ADD COLUMN all_day INTEGER NOT NULL DEFAULT 0")
     except Exception:
         pass
     conn.commit()
@@ -175,4 +189,57 @@ def delete_event(event_id: int):
     conn = get_db()
     conn.execute("DELETE FROM events WHERE id = ?", (event_id,))
     conn.commit()
+    conn.close()
+
+
+def get_reminders_for_day(target_date: date):
+    conn = get_db()
+    cursor = conn.execute(
+        "SELECT * FROM reminders WHERE reminder_dt LIKE ? ORDER BY reminder_dt",
+        (target_date.strftime("%Y-%m-%d") + "%",),
+    )
+    reminders = [dict(row) for row in cursor.fetchall()]
+    conn.close()
+    return reminders
+
+
+def add_reminder(title, reminder_dt, color="AMBER_700", all_day=0):
+    conn = get_db()
+    cursor = conn.execute(
+        "INSERT INTO reminders (title, reminder_dt, color, all_day) VALUES (?, ?, ?, ?)",
+        (title, reminder_dt, color, all_day),
+    )
+    conn.commit()
+    reminder_id = cursor.lastrowid
+    conn.close()
+    return reminder_id
+
+
+def delete_reminder(reminder_id: int):
+    conn = get_db()
+    conn.execute("DELETE FROM reminders WHERE id = ?", (reminder_id,))
+    conn.commit()
+    conn.close()
+
+
+def update_reminder(reminder_id: int, title: str = None, reminder_dt: str = None, color: str = None, all_day: int = None):
+    conn = get_db()
+    fields = []
+    values = []
+    if title is not None:
+        fields.append("title=?")
+        values.append(title)
+    if reminder_dt is not None:
+        fields.append("reminder_dt=?")
+        values.append(reminder_dt)
+    if color is not None:
+        fields.append("color=?")
+        values.append(color)
+    if all_day is not None:
+        fields.append("all_day=?")
+        values.append(all_day)
+    if fields:
+        values.append(reminder_id)
+        conn.execute(f"UPDATE reminders SET {', '.join(fields)} WHERE id=?", values)
+        conn.commit()
     conn.close()
