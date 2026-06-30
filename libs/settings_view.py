@@ -60,6 +60,8 @@ class SettingsView(ft.Container):
 
     def save_settings(self, e):
         # Update _cfg from inputs
+        has_errors = False
+        
         for (section, key), control in self.inputs.items():
             if isinstance(control, ft.Switch):
                 _cfg[section][key] = control.value
@@ -71,19 +73,25 @@ class SettingsView(ft.Container):
                     try:
                         _cfg[section][key] = int(val_str)
                     except ValueError:
-                        pass # Ignore invalid int
+                        has_errors = True
                 elif isinstance(orig_val, list):
                     # parse comma separated ints
                     try:
                         _cfg[section][key] = [int(x.strip()) for x in val_str.split(",") if x.strip()]
                     except ValueError:
-                        pass # Ignore invalid list
+                        has_errors = True
                 else:
                     _cfg[section][key] = val_str
         
-        with open(SETTINGS_FILE, "w", encoding="utf-8") as f:
-            json.dump(_cfg, f, indent=4)
-        
-        self.main_page.snack_bar = ft.SnackBar(ft.Text("Settings saved! Please restart the app."))
+        if has_errors:
+            self.main_page.snack_bar = ft.SnackBar(
+                ft.Text("Some settings failed to save due to invalid formatting (e.g. text in a number field).", color=ft.Colors.WHITE),
+                bgcolor=ft.Colors.RED_700
+            )
+        else:
+            with open(SETTINGS_FILE, "w", encoding="utf-8") as f:
+                json.dump(_cfg, f, indent=4)
+            self.main_page.snack_bar = ft.SnackBar(ft.Text("Settings saved! Please restart the app."))
+            
         self.main_page.snack_bar.open = True
         self.main_page.update()

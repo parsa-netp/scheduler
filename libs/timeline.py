@@ -116,6 +116,7 @@ class Timeline(ft.Container):
         self.expand = True
 
         grid_controls = []
+        grid_controls.append(ft.Text("GMT+03:30", top=-10, left=4, size=9, color=LABEL_COLOR))
         for hour in range(24):
             y = hour * HOUR_HEIGHT
             # Lower the 00:00 label slightly so it is not cut off by the top border
@@ -154,7 +155,7 @@ class Timeline(ft.Container):
         self.date_text = ft.Text(self.current_date.strftime("%B %d, %Y"), size=16, weight=ft.FontWeight.BOLD, color=TEXT_COLOR)
 
         def prev_date(e):
-            v = self.view_dropdown.value
+            v = self.current_view_mode
             if v == "Day":
                 self.current_date -= timedelta(days=1)
             elif v == "3 Days":
@@ -174,12 +175,12 @@ class Timeline(ft.Container):
             self.update_header()
             self.refresh_events()
             try:
-                self.update()
+                self.main_page.update()
             except RuntimeError:
                 pass
 
         def next_date(e):
-            v = self.view_dropdown.value
+            v = self.current_view_mode
             if v == "Day":
                 self.current_date += timedelta(days=1)
             elif v == "3 Days":
@@ -199,49 +200,105 @@ class Timeline(ft.Container):
             self.update_header()
             self.refresh_events()
             try:
-                self.update()
+                self.main_page.update()
             except RuntimeError:
                 pass
 
-        def on_view_changed(e):
+        self.current_view_mode = "Day"
+
+        def on_view_changed(v):
+            self.current_view_mode = v
+            self.view_dropdown.content.content.controls[0].value = v
+            self.view_dropdown.update()
             self.update_header()
             self.refresh_events()
             try:
-                self.update()
+                self.main_page.update()
             except RuntimeError:
                 pass
 
-        self.view_dropdown = ft.Dropdown(
-            value="Day",
-            options=[
-                ft.dropdown.Option("Day"),
-                ft.dropdown.Option("3 Days"),
-                ft.dropdown.Option("Week"),
-                ft.dropdown.Option("Month"),
-            ],
-            width=100,
-            text_size=12,
-            height=40,
-            content_padding=10,
+        self.view_dropdown = ft.PopupMenuButton(
+            content=ft.Container(
+                content=ft.Row([
+                    ft.Text("Day", size=14, weight=ft.FontWeight.W_500, color=TEXT_COLOR),
+                    ft.Icon(ft.Icons.ARROW_DROP_DOWN, color=TEXT_COLOR)
+                ], alignment=ft.MainAxisAlignment.CENTER, spacing=4),
+                bgcolor=ft.Colors.TRANSPARENT,
+                border_radius=4,
+                border=ft.Border.all(1, LINE_COLOR),
+                padding=ft.Padding(12, 6, 8, 6),
+            ),
+            items=[
+                ft.PopupMenuItem(content=ft.Text("Day"), on_click=lambda _: on_view_changed("Day")),
+                ft.PopupMenuItem(content=ft.Text("3 Days"), on_click=lambda _: on_view_changed("3 Days")),
+                ft.PopupMenuItem(content=ft.Text("Week"), on_click=lambda _: on_view_changed("Week")),
+                ft.PopupMenuItem(content=ft.Text("Month"), on_click=lambda _: on_view_changed("Month")),
+            ]
         )
-        self.view_dropdown.on_change = on_view_changed
+
+        def go_to_today(e):
+            self.current_date = date.today()
+            self.update_header()
+            self.refresh_events()
+            try:
+                self.main_page.update()
+            except RuntimeError:
+                pass
+
+        self.today_button = ft.OutlinedButton(
+            "Today",
+            on_click=go_to_today,
+            style=ft.ButtonStyle(
+                color=TEXT_COLOR,
+                shape=ft.RoundedRectangleBorder(radius=4),
+                padding=ft.Padding(16, 0, 16, 0),
+                side=ft.BorderSide(1, LINE_COLOR),
+            ),
+            height=36,
+        )
+
+        self.hamburger = ft.IconButton(icon=ft.Icons.MENU, icon_color=TEXT_COLOR)
+        
+        # Google Calendar Style Title (Blue 30 square)
+        self.title_icon = ft.Container(
+            content=ft.Text("30", color=ft.Colors.WHITE, size=14, weight=ft.FontWeight.W_500),
+            bgcolor="#A8C7FA", 
+            border_radius=4,
+            width=28, height=28,
+            alignment=ft.alignment.Alignment(0, 0)
+        )
+        self.title_text = ft.Text("Calendar", size=20, color=TEXT_COLOR, weight=ft.FontWeight.W_400)
+
+        # Right side utility icons (Removed Search, Support, Apps)
+        self.util_icons = ft.Row([
+            ft.IconButton(icon=ft.Icons.SETTINGS_OUTLINED, icon_color=TEXT_COLOR, tooltip="Settings", on_click=lambda e: getattr(self, 'on_settings_click', lambda _: None)(e)),
+            self.view_dropdown,
+        ], spacing=0)
 
         self.header = ft.Container(
-            padding=ft.Padding(10, 10, 10, 5),
+            padding=ft.Padding(10, 10, 10, 10),
             content=ft.Row([
                 ft.Row([
+                    self.hamburger,
+                    self.title_icon,
+                    ft.Container(width=4),
+                    self.title_text,
+                    ft.Container(width=40),
+                    self.today_button,
+                    ft.Container(width=10),
                     ft.IconButton(icon=ft.Icons.CHEVRON_LEFT, on_click=prev_date, icon_color=TEXT_COLOR),
-                    self.date_text,
                     ft.IconButton(icon=ft.Icons.CHEVRON_RIGHT, on_click=next_date, icon_color=TEXT_COLOR),
-                ], alignment=ft.MainAxisAlignment.START),
-                self.view_dropdown
-            ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN)
+                    ft.Container(width=10),
+                    self.date_text,
+                ], alignment=ft.MainAxisAlignment.START, vertical_alignment=ft.CrossAxisAlignment.CENTER),
+                self.util_icons
+            ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN, vertical_alignment=ft.CrossAxisAlignment.CENTER)
         )
 
         self.column_headers_row = ft.Row(
             spacing=0,
             visible=False,
-            height=30,
+            height=70,
         )
 
         self.month_grid = ft.Column(spacing=5, expand=True)
@@ -253,14 +310,13 @@ class Timeline(ft.Container):
         )
 
         self.content = ft.Column([
-            self.header,
             self.column_headers_row,
             self.list_view,
             self.month_container
         ], expand=True, spacing=0)
 
     def update_header(self):
-        v = self.view_dropdown.value
+        v = self.current_view_mode
         if v == "Day":
             self.date_text.value = self.current_date.strftime("%B %d, %Y")
         elif v == "3 Days":
@@ -284,7 +340,7 @@ class Timeline(ft.Container):
 
     def refresh_events(self, open_event_id=None):
         self.event_stack.controls.clear()
-        v = self.view_dropdown.value
+        v = self.current_view_mode
         
         if v == "Month":
             self.list_view.visible = False
@@ -316,15 +372,27 @@ class Timeline(ft.Container):
             self.column_headers_row.controls.append(ft.Container(width=LABEL_WIDTH))
             for d_idx in range(num_days):
                 d = self.current_date + timedelta(days=d_idx)
-                header_text = d.strftime("%a %d")
                 is_today = d == date.today()
-                text_color = ft.Colors.BLUE_400 if is_today else TEXT_COLOR
+                
+                day_name_color = "#A8C7FA" if is_today else LABEL_COLOR
+                date_num_color = "#202124" if is_today else TEXT_COLOR
+                date_num_bg = "#A8C7FA" if is_today else ft.Colors.TRANSPARENT
+                
                 self.column_headers_row.controls.append(
                     ft.Container(
-                        content=ft.Text(header_text, size=11, color=text_color, weight=ft.FontWeight.BOLD, text_align=ft.TextAlign.CENTER),
+                        content=ft.Column([
+                            ft.Text(d.strftime("%a").upper(), size=11, color=day_name_color, weight=ft.FontWeight.W_500),
+                            ft.Container(
+                                content=ft.Text(str(d.day), size=22, color=date_num_color, weight=ft.FontWeight.W_400),
+                                width=46, height=46,
+                                bgcolor=date_num_bg,
+                                border_radius=23,
+                                alignment=ft.alignment.Alignment(0, 0)
+                            )
+                        ], alignment=ft.MainAxisAlignment.CENTER, horizontal_alignment=ft.CrossAxisAlignment.CENTER, spacing=2),
                         expand=True,
                         alignment=ft.alignment.Alignment(0, 0),
-                        border=ft.Border(bottom=ft.BorderSide(2, ft.Colors.BLUE_400 if is_today else ft.Colors.TRANSPARENT))
+                        border=ft.Border(left=ft.BorderSide(1, LINE_COLOR))
                     )
                 )
             self.column_headers_row.visible = True
@@ -378,12 +446,22 @@ class Timeline(ft.Container):
                     top_pos = rem_dt.hour * HOUR_HEIGHT + rem_dt.minute * HOUR_HEIGHT / 60
                     rem_widget = TimedReminder(self, rem, top_pos, is_multiday=True).container
                     day_stack.controls.append(rem_widget)
+                    
+                # Current time indicator
+                if day_date == date.today():
+                    now = datetime.now()
+                    top_pos = now.hour * HOUR_HEIGHT + now.minute * HOUR_HEIGHT / 60
+                    time_indicator = ft.Stack([
+                        ft.Container(top=4, left=0, right=0, height=2, bgcolor="#EA4335"),
+                        ft.Container(top=0, left=-5, width=10, height=10, bgcolor="#EA4335", border_radius=5)
+                    ], top=top_pos - 4, left=0, right=0, height=10)
+                    day_stack.controls.append(time_indicator)
                 
                 columns_row.controls.append(
                     ft.Container(
                         content=day_stack,
                         expand=True,
-                        border=ft.Border(right=ft.BorderSide(1, LINE_COLOR))
+                        border=ft.Border(left=ft.BorderSide(1, LINE_COLOR))
                     )
                 )
             
@@ -431,110 +509,14 @@ class Timeline(ft.Container):
             pass
 
     def render_month_grid(self):
-        self.month_grid.controls.clear()
-        
-        # Grid Headers
-        weekdays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
-        headers = ft.Row(
-            controls=[
-                ft.Container(
-                    content=ft.Text(w, size=11, color=LABEL_COLOR, weight=ft.FontWeight.BOLD, text_align=ft.TextAlign.CENTER),
-                    expand=True,
-                    alignment=ft.alignment.Alignment(0, 0)
-                ) for w in weekdays
-            ],
-            spacing=5
-        )
-        self.month_grid.controls.append(headers)
-        
-        year = self.current_date.year
-        month = self.current_date.month
-        first_day_weekday, num_days = monthrange(year, month)
-        
-        # Adjust Sun=0 to Sat=6 (first_day_weekday is Mon=0 to Sun=6)
-        start_offset = (first_day_weekday + 1) % 7
-        first_day_of_month = date(year, month, 1)
-        grid_start = first_day_of_month - timedelta(days=start_offset)
-        
-        for r_idx in range(6):
-            row_controls = []
-            for c_idx in range(7):
-                cell_date = grid_start + timedelta(days=r_idx * 7 + c_idx)
-                is_curr_month = cell_date.month == month
-                is_today = cell_date == date.today()
-                
-                day_events = get_events_for_day(cell_date)
-                day_reminders = get_reminders_for_day(cell_date)
-                
-                mixed_items = []
-                for ev in day_events:
-                    mixed_items.append((ev["title"], ev.get("color", "BLUE_700"), "E"))
-                for rem in day_reminders:
-                    mixed_items.append((rem["title"], rem.get("color", "AMBER_700"), "R"))
-                
-                indicators = []
-                for title, color_name, item_type in mixed_items[:3]:
-                    color = getattr(ft.Colors, color_name, ft.Colors.BLUE_700)
-                    prefix = "• " if item_type == "E" else "⏰ "
-                    indicators.append(
-                        ft.Container(
-                            content=ft.Text(f"{prefix}{title}", size=8, color=TEXT_COLOR, overflow=ft.TextOverflow.ELLIPSIS, max_lines=1),
-                            bgcolor=ft.Colors.with_opacity(0.15, color),
-                            border_radius=2,
-                            padding=ft.Padding(4, 1, 4, 1),
-                        )
-                    )
-                
-                lbl_color = TEXT_COLOR if is_curr_month else LABEL_COLOR
-                lbl_weight = ft.FontWeight.BOLD if is_today else ft.FontWeight.NORMAL
-                lbl_bg = ft.Colors.BLUE_700 if is_today else ft.Colors.TRANSPARENT
-                
-                day_num_btn = ft.Container(
-                    content=ft.Text(str(cell_date.day), size=10, color=ft.Colors.WHITE if is_today else lbl_color, weight=lbl_weight),
-                    width=18,
-                    height=18,
-                    bgcolor=lbl_bg,
-                    border_radius=9,
-                    alignment=ft.alignment.Alignment(0, 0)
-                )
-                
-                cell_content = ft.Column(
-                    [
-                        ft.Row([day_num_btn], alignment=ft.MainAxisAlignment.END),
-                        ft.Column(indicators, spacing=2, expand=True, scroll=ft.ScrollMode.HIDDEN)
-                    ],
-                    spacing=4,
-                    tight=True
-                )
-                
-                def on_cell_click(e, d=cell_date):
-                    self.current_date = d
-                    self.view_dropdown.value = "Day"
-                    self.update_header()
-                    self.refresh_events()
-                    self.view_dropdown.update()
-
-                row_controls.append(
-                    ft.Container(
-                        content=cell_content,
-                        expand=True,
-                        bgcolor=BOX_COLOR if is_curr_month else ft.Colors.with_opacity(0.03, BOX_COLOR),
-                        border=ft.Border.all(1, LINE_COLOR),
-                        border_radius=4,
-                        padding=5,
-                        on_click=lambda e, d=cell_date: on_cell_click(e, d),
-                    )
-                )
-            
-            self.month_grid.controls.append(ft.Row(row_controls, spacing=5, expand=True))
-        
-        self.month_container.update()
+        from libs.month_view import render_month_grid
+        render_month_grid(self)
 
     def _build_all_day_reminder_card(self, reminder_data):
         color_name = reminder_data.get("color", "AMBER_700")
         color = getattr(ft.Colors, color_name, ft.Colors.AMBER_700)
         
-        v = self.view_dropdown.value
+        v = self.current_view_mode
         is_multiday = v in ["3 Days", "Week"]
         title_prefix = ""
         if is_multiday:
@@ -586,140 +568,8 @@ class Timeline(ft.Container):
         self.main_page.update()
 
     def add_new_reminder(self):
-        selected_date = self.current_date
-        now = datetime.now()
-        default_hour = (now.hour + 1) % 24
-        selected_time = now.replace(hour=default_hour, minute=0, second=0, microsecond=0).time()
-        selected_color = "AMBER_700"
-
-        title_tf = ft.TextField(
-            label="Title",
-            autofocus=True,
-            border_color=ft.Colors.GREY_700,
-            cursor_color=ft.Colors.WHITE,
-        )
-
-        all_day_cb = ft.Checkbox(
-            label="All day",
-            value=False,
-            fill_color=ft.Colors.BLUE_700,
-        )
-
-        def on_date_selected(e):
-            nonlocal selected_date
-            if e.control.value:
-                selected_date = e.control.value.date()
-                date_btn.content = ft.Text(selected_date.strftime("%b %d, %Y"))
-                date_btn.update()
-
-        date_picker = ft.DatePicker(
-            value=datetime.combine(selected_date, datetime.min.time()),
-            on_change=on_date_selected,
-        )
-        self.main_page.overlay.append(date_picker)
-
-        def show_date_picker(e):
-            date_picker.open = True
-            self.main_page.update()
-
-        date_btn = ft.OutlinedButton(
-            content=ft.Text(selected_date.strftime("%b %d, %Y")),
-            icon=ft.Icons.CALENDAR_MONTH,
-            on_click=show_date_picker,
-        )
-
-        def on_time_selected(e):
-            nonlocal selected_time
-            if e.control.value:
-                selected_time = e.control.value
-                time_btn.content = ft.Text(selected_time.strftime("%H:%M"))
-                time_btn.update()
-
-        time_picker = ft.TimePicker(value=selected_time, on_change=on_time_selected)
-        self.main_page.overlay.append(time_picker)
-
-        def show_time_picker(e):
-            time_picker.open = True
-            self.main_page.update()
-
-        time_btn = ft.OutlinedButton(
-            content=ft.Text(selected_time.strftime("%H:%M")),
-            icon=ft.Icons.ACCESS_TIME,
-            on_click=show_time_picker,
-        )
-
-        def on_all_day_changed(e):
-            time_btn.visible = not all_day_cb.value
-            time_btn.update()
-
-        all_day_cb.on_change = on_all_day_changed
-
-        colors_list = ["AMBER_700", "RED_700", "BLUE_700", "GREEN_700", "PURPLE_700"]
-        color_row = ft.Row(spacing=8)
-
-        def select_color(e, color_name):
-            nonlocal selected_color
-            selected_color = color_name
-            for child in color_row.controls:
-                child.border = ft.Border.all(2, ft.Colors.WHITE if child.key == selected_color else ft.Colors.TRANSPARENT)
-            color_row.update()
-
-        for c in colors_list:
-            is_selected = (c == selected_color)
-            color_row.controls.append(
-                ft.Container(
-                    key=c, width=24, height=24,
-                    bgcolor=getattr(ft.Colors, c),
-                    border_radius=12,
-                    border=ft.Border.all(2, ft.Colors.WHITE if is_selected else ft.Colors.TRANSPARENT),
-                    on_click=lambda e, col=c: select_color(e, col),
-                )
-            )
-
-        def remove_pickers():
-            if date_picker in self.main_page.overlay:
-                date_picker.open = False
-                self.main_page.overlay.remove(date_picker)
-            if time_picker in self.main_page.overlay:
-                time_picker.open = False
-                self.main_page.overlay.remove(time_picker)
-
-        def close_dlg(e):
-            remove_pickers()
-            dlg.open = False
-            self.main_page.update()
-
-        def save(e):
-            is_all_day = 1 if all_day_cb.value else 0
-            rem_time = selected_time if not all_day_cb.value else datetime.min.time()
-            reminder_dt = datetime.combine(selected_date, rem_time).strftime("%Y-%m-%d %H:%M:%S")
-            db_add_reminder(title_tf.value or "Reminder", reminder_dt, selected_color, is_all_day)
-            remove_pickers()
-            dlg.open = False
-            self.main_page.update()
-            self.refresh_events()
-
-        dlg = ft.AlertDialog(
-            title=ft.Text("New Reminder"),
-            content=ft.Column([
-                title_tf,
-                all_day_cb,
-                ft.Text("Date & Time:", weight=ft.FontWeight.BOLD),
-                date_btn,
-                time_btn,
-                ft.Text("Color:", weight=ft.FontWeight.BOLD),
-                color_row,
-            ], width=300, spacing=10, tight=True),
-            actions=[
-                ft.Row([
-                    ft.TextButton("Cancel", on_click=close_dlg),
-                    ft.TextButton("Save", on_click=save),
-                ], alignment=ft.MainAxisAlignment.END, spacing=4),
-            ],
-        )
-        self.main_page.overlay.append(dlg)
-        dlg.open = True
-        self.main_page.update()
+        from libs.dialogs import show_reminder_dialog
+        show_reminder_dialog(self, self.main_page, self.current_date)
 
     def add_new_event(self):
         existing = get_events_for_day(self.current_date)

@@ -15,69 +15,72 @@ def get_db():
 
 def init_db():
     conn = get_db()
-    # Events table
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS events (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            title TEXT NOT NULL,
-            start_dt TEXT NOT NULL,
-            end_dt TEXT NOT NULL,
-            icon TEXT DEFAULT 'EVENT',
-            color TEXT DEFAULT 'BLUE_700',
-            description TEXT NOT NULL DEFAULT ''
-        )
-    """)
-    # Notes table (multi-note, Google Keep style)
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS notes (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            title TEXT NOT NULL DEFAULT '',
-            content TEXT NOT NULL DEFAULT '',
-            color TEXT NOT NULL DEFAULT 'GREY_700',
-            pinned INTEGER NOT NULL DEFAULT 0,
-            created_at TEXT NOT NULL,
-            updated_at TEXT NOT NULL
-        )
-    """)
-    # Reminders table
-    conn.execute("""
-        CREATE TABLE IF NOT EXISTS reminders (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            title TEXT NOT NULL,
-            reminder_dt TEXT NOT NULL,
-            color TEXT DEFAULT 'AMBER_700',
-            all_day INTEGER DEFAULT 0
-        )
-    """)
-    # Migrate old schema if needed (add missing columns)
-    try:
-        conn.execute("ALTER TABLE notes ADD COLUMN title TEXT NOT NULL DEFAULT ''")
-    except Exception:
-        pass
-    try:
-        conn.execute("ALTER TABLE notes ADD COLUMN color TEXT NOT NULL DEFAULT 'GREY_700'")
-    except Exception:
-        pass
-    try:
-        conn.execute("ALTER TABLE notes ADD COLUMN pinned INTEGER NOT NULL DEFAULT 0")
-    except Exception:
-        pass
-    try:
-        conn.execute("ALTER TABLE notes ADD COLUMN created_at TEXT NOT NULL DEFAULT ''")
-    except Exception:
-        pass
-    try:
-        conn.execute("ALTER TABLE notes ADD COLUMN updated_at TEXT NOT NULL DEFAULT ''")
-    except Exception:
-        pass
-    try:
-        conn.execute("ALTER TABLE events ADD COLUMN description TEXT NOT NULL DEFAULT ''")
-    except Exception:
-        pass
-    try:
-        conn.execute("ALTER TABLE reminders ADD COLUMN all_day INTEGER NOT NULL DEFAULT 0")
-    except Exception:
-        pass
+    
+    cursor = conn.execute("PRAGMA user_version")
+    version = cursor.fetchone()[0]
+
+    if version == 0:
+        # Check if this is a fresh install or an upgrade from the unversioned schema
+        cursor = conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='events'")
+        has_tables = cursor.fetchone() is not None
+
+        if not has_tables:
+            # Fresh install
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS events (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    title TEXT NOT NULL,
+                    start_dt TEXT NOT NULL,
+                    end_dt TEXT NOT NULL,
+                    icon TEXT DEFAULT 'EVENT',
+                    color TEXT DEFAULT 'BLUE_700',
+                    description TEXT NOT NULL DEFAULT ''
+                )
+            """)
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS notes (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    title TEXT NOT NULL DEFAULT '',
+                    content TEXT NOT NULL DEFAULT '',
+                    color TEXT NOT NULL DEFAULT 'GREY_700',
+                    pinned INTEGER NOT NULL DEFAULT 0,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL
+                )
+            """)
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS reminders (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    title TEXT NOT NULL,
+                    reminder_dt TEXT NOT NULL,
+                    color TEXT DEFAULT 'AMBER_700',
+                    all_day INTEGER DEFAULT 0
+                )
+            """)
+        else:
+            # Upgrade from unversioned schema - run safe alter statements one last time
+            try: conn.execute("ALTER TABLE notes ADD COLUMN title TEXT NOT NULL DEFAULT ''")
+            except Exception: pass
+            try: conn.execute("ALTER TABLE notes ADD COLUMN color TEXT NOT NULL DEFAULT 'GREY_700'")
+            except Exception: pass
+            try: conn.execute("ALTER TABLE notes ADD COLUMN pinned INTEGER NOT NULL DEFAULT 0")
+            except Exception: pass
+            try: conn.execute("ALTER TABLE notes ADD COLUMN created_at TEXT NOT NULL DEFAULT ''")
+            except Exception: pass
+            try: conn.execute("ALTER TABLE notes ADD COLUMN updated_at TEXT NOT NULL DEFAULT ''")
+            except Exception: pass
+            try: conn.execute("ALTER TABLE events ADD COLUMN description TEXT NOT NULL DEFAULT ''")
+            except Exception: pass
+            try: conn.execute("ALTER TABLE reminders ADD COLUMN all_day INTEGER NOT NULL DEFAULT 0")
+            except Exception: pass
+
+        conn.execute("PRAGMA user_version = 1")
+    
+    # Future migrations will look like:
+    # if version == 1:
+    #     conn.execute("ALTER TABLE ...")
+    #     conn.execute("PRAGMA user_version = 2")
+
     conn.commit()
     conn.close()
 

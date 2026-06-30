@@ -1,5 +1,6 @@
 import re
 import flet as ft
+import threading
 from datetime import datetime
 from libs.database import get_all_notes, add_note, get_note_by_id, update_note, delete_note
 from libs.constants import BOX_COLOR, RADIUS, TEXT_COLOR, LABEL_COLOR, LINE_COLOR
@@ -22,6 +23,7 @@ class Notepad(ft.Container):
 
         self.current_note_id = None
         self.selected_color = "GREY_700"
+        self._debounce_timer = None
 
         self._build_editor()
         self.grid_content = ft.Column(expand=True, spacing=15)
@@ -156,11 +158,18 @@ class Notepad(ft.Container):
 
     def _on_edit_changed(self, e):
         if self.current_note_id:
-            update_note(
-                self.current_note_id,
-                title=self.title_field.value,
-                content=self.content_field.value,
-            )
+            if self._debounce_timer:
+                self._debounce_timer.cancel()
+            
+            def save_now():
+                update_note(
+                    self.current_note_id,
+                    title=self.title_field.value,
+                    content=self.content_field.value,
+                )
+                
+            self._debounce_timer = threading.Timer(1.0, save_now)
+            self._debounce_timer.start()
 
     def _select_color(self, color):
         self.selected_color = color

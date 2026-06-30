@@ -1,5 +1,6 @@
 import flet as ft
 from libs.database import init_db
+from libs.mini_calendar import MiniCalendar
 from libs.constants import (
     PAGE_COLOR,
     WINDOW_COLOR,
@@ -9,6 +10,8 @@ from libs.constants import (
     ADD_BUTTON_MINI,
     ADD_BUTTON_RIGHT,
     ADD_BUTTON_BOTTOM,
+    BOX_COLOR,
+    RADIUS,
 )
 from libs.timeline import Timeline
 from libs.notepad import Notepad
@@ -25,93 +28,38 @@ def main(page: ft.Page):
     my_notepad = Notepad(page)
     my_settings = SettingsView(page)
 
-    viewport = ft.Container(content=my_timeline, expand=True, padding=PADDING)
+    top_bar = ft.Container(
+        content=my_timeline.header,
+        visible=True,
+        bgcolor=BOX_COLOR,
+        border_radius=0,
+        padding=0,
+        margin=0,
+    )
+
+    viewport = ft.Container(
+        content=my_timeline, 
+        expand=True, 
+        padding=ft.Padding(left=PADDING, top=0, right=PADDING, bottom=PADDING)
+    )
 
     # --- Timeline speed-dial (Event + Reminder) ---
-    create_menu_visible = False
-
-    def close_create_menu():
-        nonlocal create_menu_visible
-        create_menu_visible = False
-        create_menu.visible = False
-        timeline_fab.icon = ft.Icons.ADD
-        timeline_fab.bgcolor = None
-        create_menu.update()
-        timeline_fab.update()
-
-    def add_event_from_menu(e):
-        close_create_menu()
-        my_timeline.add_new_event()
-
-    def add_reminder_from_menu(e):
-        close_create_menu()
-        my_timeline.add_new_reminder()
-
-    def make_menu_item(icon, text, color, on_click):
-        item = ft.Container(
+    create_btn = ft.PopupMenuButton(
+        content=ft.Container(
             content=ft.Row([
-                ft.Icon(icon, color=color, size=18),
-                ft.Text(text, color=TEXT_COLOR, size=13, weight=ft.FontWeight.W_500),
-            ], spacing=10),
-            padding=ft.Padding(16, 10, 16, 10),
-            on_click=on_click,
-            border_radius=8,
-        )
-        
-        def on_hover(e):
-            item.bgcolor = ft.Colors.with_opacity(0.08, ft.Colors.WHITE) if e.data == "true" else ft.Colors.TRANSPARENT
-            item.update()
-            
-        item.on_hover = on_hover
-        return item
-
-    reminder_item = make_menu_item(ft.Icons.ALARM, "Reminder", ft.Colors.AMBER_400, add_reminder_from_menu)
-    event_item = make_menu_item(ft.Icons.EVENT, "Event", ft.Colors.BLUE_400, add_event_from_menu)
-    divider = ft.Divider(height=1, thickness=1, color=ft.Colors.GREY_800)
-
-    create_menu = ft.Container(
-        visible=False,
-        width=150,
-        bgcolor=ft.Colors.GREY_900,
-        border_radius=12,
-        border=ft.Border.all(1, ft.Colors.GREY_800),
-        shadow=ft.BoxShadow(
-            spread_radius=1,
-            blur_radius=15,
-            color=ft.Colors.with_opacity(0.4, ft.Colors.BLACK),
-            offset=ft.Offset(0, 4)
+                ft.Icon(ft.Icons.ADD, color=TEXT_COLOR),
+                ft.Text("Create", size=14, weight=ft.FontWeight.W_500, color=TEXT_COLOR),
+                ft.Icon(ft.Icons.ARROW_DROP_DOWN, color=TEXT_COLOR)
+            ], alignment=ft.MainAxisAlignment.CENTER),
+            bgcolor="#2D2E30",
+            border_radius=24,
+            width=140,
+            padding=ft.Padding(12, 12, 12, 12),
         ),
-        padding=ft.Padding(4, 4, 4, 4),
-        content=ft.Column([
-            reminder_item,
-            divider,
-            event_item,
-        ], spacing=0, tight=True)
-    )
-
-    timeline_fab = ft.FloatingActionButton(
-        icon=ft.Icons.ADD,
-        on_click=lambda _: toggle_create_menu(),
-        mini=ADD_BUTTON_MINI,
-    )
-
-    def toggle_create_menu():
-        nonlocal create_menu_visible
-        create_menu_visible = not create_menu_visible
-        create_menu.visible = create_menu_visible
-        if create_menu_visible:
-            timeline_fab.icon = ft.Icons.CLOSE
-            timeline_fab.bgcolor = ft.Colors.RED_700
-        else:
-            timeline_fab.icon = ft.Icons.ADD
-            timeline_fab.bgcolor = None
-        create_menu.update()
-        timeline_fab.update()
-
-    timeline_create_group = ft.Column(
-        horizontal_alignment=ft.CrossAxisAlignment.END,
-        spacing=8,
-        controls=[create_menu, timeline_fab],
+        items=[
+            ft.PopupMenuItem(content=ft.Row([ft.Icon(ft.Icons.EVENT), ft.Text("Event")]), on_click=lambda _: my_timeline.add_new_event()),
+            ft.PopupMenuItem(content=ft.Row([ft.Icon(ft.Icons.ALARM), ft.Text("Reminder")]), on_click=lambda _: my_timeline.add_new_reminder()),
+        ]
     )
 
     # --- Notes single FAB ---
@@ -126,55 +74,94 @@ def main(page: ft.Page):
         selected = e.control.selected_index
         if selected == 0:
             viewport.content = my_timeline
-            timeline_create_group.visible = True
+            top_bar.visible = True
+            create_btn.visible = True
             notes_fab.visible = False
-            create_menu_visible = False
-            create_menu.visible = False
-            timeline_fab.icon = ft.Icons.ADD
-            timeline_fab.bgcolor = None
             my_timeline.refresh_events()
+            mini_cal.set_selected_date(my_timeline.current_date)
         elif selected == 1:
             viewport.content = my_notepad
-            timeline_create_group.visible = False
+            top_bar.visible = False
+            create_btn.visible = False
             notes_fab.visible = True
             my_notepad.refresh_notes()
         elif selected == 2:
             viewport.content = my_settings
-            timeline_create_group.visible = False
+            top_bar.visible = False
+            create_btn.visible = False
+            create_menu.visible = False
             notes_fab.visible = False
         page.update()
 
-    page.navigation_bar = ft.CupertinoNavigationBar(
-        bgcolor=ft.Colors.with_opacity(0.25, ft.Colors.GREY_800),
-        inactive_color=LABEL_COLOR,
-        active_color=TEXT_COLOR,
-        on_change=change_view,
+    def go_to_settings(e):
+        viewport.content = my_settings
+        top_bar.visible = False
+        create_btn.visible = False
+        notes_fab.visible = False
+        page.update()
+
+    my_timeline.on_settings_click = go_to_settings
+
+    nav_rail = ft.NavigationRail(
+        selected_index=0,
+        label_type=ft.NavigationRailLabelType.ALL,
+        min_width=100,
+        min_extended_width=200,
+        extended=True,
+        expand=True,
+        bgcolor=ft.Colors.TRANSPARENT,
         destinations=[
-            ft.NavigationBarDestination(
-                icon=ft.Icons.CALENDAR_MONTH,
-                label="Timeline",
+            ft.NavigationRailDestination(
+                icon=ft.Icons.CALENDAR_MONTH_OUTLINED,
+                selected_icon=ft.Icons.CALENDAR_MONTH,
+                label="Timeline"
             ),
-            ft.NavigationBarDestination(
-                icon=ft.Icons.NOTE_ALT,
-                label="Notes",
-            ),
-            ft.NavigationBarDestination(
-                icon=ft.Icons.SETTINGS,
-                label="Settings",
+            ft.NavigationRailDestination(
+                icon=ft.Icons.NOTE_ALT_OUTLINED,
+                selected_icon=ft.Icons.NOTE_ALT,
+                label="Notes"
             ),
         ],
+        on_change=change_view,
+        indicator_color=ft.Colors.with_opacity(0.15, ft.Colors.BLUE_400)
     )
+
+    def on_mini_cal_date_selected(d):
+        my_timeline.current_date = d
+        my_timeline.update_header()
+        my_timeline.refresh_events()
+        
+    mini_cal = MiniCalendar(on_date_selected=on_mini_cal_date_selected)
+
+    sidebar = ft.Container(
+        width=250,
+        padding=ft.Padding(10, 10, 10, 10),
+        visible=True,
+        bgcolor="#202124",
+        content=ft.Column([
+            create_btn,
+            mini_cal.container,
+            ft.Container(height=10),
+            nav_rail
+        ], alignment=ft.MainAxisAlignment.START, expand=True)
+    )
+
+    def toggle_sidebar(e):
+        sidebar.visible = not sidebar.visible
+        page.update()
+
+    my_timeline.hamburger.on_click = toggle_sidebar
+
+    main_body = ft.Row([sidebar, viewport], expand=True, spacing=0)
+    main_layout = ft.Column([top_bar, main_body], expand=True, spacing=0)
+
+
 
     page.add(
         ft.Stack(
             expand=True,
             controls=[
-                viewport,
-                ft.Container(
-                    content=timeline_create_group,
-                    right=ADD_BUTTON_RIGHT,
-                    bottom=ADD_BUTTON_BOTTOM,
-                ),
+                main_layout,
                 ft.Container(
                     content=notes_fab,
                     right=ADD_BUTTON_RIGHT,

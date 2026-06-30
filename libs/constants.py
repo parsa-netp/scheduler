@@ -7,18 +7,18 @@ SETTINGS_FILE = os.path.join(SETTINGS_DIR, "settings.json")
 
 DEFAULT_SETTINGS = {
     "ui": {
-        "page_color": "GREY_900",
-        "window_color": "BLACK",
-        "box_color": "GREY_800",
-        "text_color": "WHITE",
-        "line_color": "GREY_700",
-        "label_color": "GREY_500"
+        "page_color": "#202124",
+        "window_color": "#202124",
+        "box_color": "#202124",
+        "text_color": "#E3E3E3",
+        "line_color": "#444746",
+        "label_color": "#9AA0A6"
     },
     "layout": {
         "padding": 15,
         "radius": 10,
-        "hour_height": 55,
-        "label_width": 40
+        "hour_height": 60,
+        "label_width": 55
     },
     "behavior": {
         "event_hours": [9, 10, 14, 15, 16]
